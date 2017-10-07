@@ -1,27 +1,49 @@
 #!/bin/bash
 
-# usage: pr_info <string> <info | warn | error>
+# usage: pr_info <string> <info | warn | error> [verbose]
 pr_info()
 {
-    type=$2
+    type=$2;
+	verbose=$3;
     if [ "${type}" = "" ]; then
-        type="info"
+        type="info";
     fi
+	
+	prefix="\033[3";
+	suffix="\033[0m"; #system
+	infostr="";
 
     case ${type} in
         info )
-            echo -e "\033[32m[ info ] $1\033[0m"
+			prefix+="2m"; #green
             ;;
         warn )
-            echo -e "\033[33m[ warn ] $1\033[0m"
+			prefix+="3m"; #yellow
             ;;
         error )
-            echo -e "\033[31m[ error] $1\033[0m"
+			prefix+="1m"; #red
             ;;
 		* )
 			echo $1
+			return;
 			;;
     esac
+
+	if [ "$verbose" != "" ]; then
+		case ${type} in
+			info )
+				infostr="[ info ] ";
+			;;
+			warn )
+				infostr="[ warn ] ";
+			;;
+			error )
+				infostr="[ error] ";
+			;;
+		esac
+	fi
+	
+	echo -e "${prefix}${infostr}${1}${suffix}"	
 }
 
 
@@ -76,6 +98,6 @@ pr_key_value()
 		val=${varr[$i]};
 
 		str=`printf "| %-${lk}s | %-${lv}s |" $key $val`
-		pr_info "$str" $level
+		pr_info "$str" $level 
 	}
 }
