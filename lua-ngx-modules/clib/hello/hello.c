@@ -4,8 +4,8 @@
 
 static int hello(lua_State *L)
 {
-	printf("hello world!\n");
-	return 0;
+	lua_pushstring(L, "hello world!\n");
+	return 1;
 }
 
 static luaL_Reg myapis[] = {

@@ -219,11 +219,25 @@ build_ngx()
 digest()
 {
 	wrk=`cd ${WRK_Lo}; pwd`
-	pr_info "++++++++++++++ Summary for Ngx Env +++++++++++++++++" info
-	pr_info "+ working_directory | ${wrk} " info
-	pr_info "+ ngx_dir           | ${Ngnix_Path}" info
-	pr_info "+ ngx_build_script  " info
-	pr_info "${Ngx_Build_Script} " info
+	output="++++++++++++++ Summary for Ngx Env +++++++++++++++++";
+	pr_info "${output}" info
+	echo "$output" > ./Summary
+	
+	output="+ working_directory | ${wrk} "
+	pr_info "${output}" info
+	echo "$output" >> ./Summary
+	
+	output="+ ngx_dir           | ${Ngnix_Path}"
+	pr_info "${output}" info
+	echo "$output" >> ./Summary
+	
+	output="+ ngx_build_script  | "
+	pr_info "${output}" info
+	echo "$output" >> ./Summary
+	
+	output="${Ngx_Build_Script} "
+	pr_info "${output}" info
+	echo "$output" >> ./Summary
 }
 
 
