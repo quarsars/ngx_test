@@ -132,7 +132,7 @@ build_ngx()
 {
 	curr=`pwd`;
 	Ngnix_Path=`cd ${WRK_Lo}; pwd`;
-	Ngnix_Path+="/ngnix";
+	Ngnix_Path+="/nginx";
 	
 	ngx_log=`cd ${WRK_Lo}; pwd`;
 	ngx_log+="/ngx.build_log"
