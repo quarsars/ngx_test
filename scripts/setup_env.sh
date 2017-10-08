@@ -2,7 +2,7 @@
 
 Scr_Lo=$(dirname $0)							# scripts location
 RES_Lo="${Scr_Lo}/../resource"					# resource location
-
+WRK_Lo="${Scr_Lo}/../work"						# working directory
 
 declare -A RES_URLs  # resource's URLs
 RES_URLs=(
@@ -12,11 +12,37 @@ RES_URLs=(
 ['ngx']='https://nginx.org/download/nginx-1.13.5.tar.gz'
 )
 
+declare -A RES_PRE_URLs
+RES_PRE_URLs=(
+['PCRE']='ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.38.tar.gz'
+['gzip']='http://www.gzip.org/gz124src.zip'
+['zlib']='https://zlib.net/zlib-1.2.11.tar.gz'
+)
+
 declare -A RES_FILEs;
-
-
+declare -A REP_DIRs;
+LuaJit_Path="";
+Ngnix_Path="";
+Ngx_Build_Script="";
 
 source ${Scr_Lo}/common.sh
+
+
+
+pre_work()
+{
+	if [ ! -d ${RES_Lo} ]; then
+		mkdir -p ${RES_Lo};
+	fi
+	
+	if [ ! -d ${WRK_Lo} ]; then
+		mkdir -p ${WRK_Lo};
+	fi
+
+	# prerequire
+	
+	
+}
 
 dl()
 {
@@ -32,12 +58,133 @@ dl()
 	done
 }
 
+unzip()
+{
+	dirabs=`cd ${RES_Lo}; pwd`;
+	for k in ${!RES_FILEs[@]}; do
+		if [ ! -d "${dirabs}/${k}" ]; then
+			mkdir -p "${dirabs}/${k}"
+		fi
+		if [ ! -f "${dirabs}/${k}/.extract.tag" ]; then
+			tar -zxvf "${RES_Lo}/${RES_FILEs[${k}]}" -C "${dirabs}/${k}" > /dev/null
+			touch "${dirabs}/${k}/.extract.tag"
+		fi
+		# echo ${dirabs}/${k}
+		# ls ${dirabs}/${k}
+		p=`ls ${dirabs}/${k}`		
 
+		pr_info "${k} extracted to: ${dirabs}/${k}/${p}" info verbose
+		REP_DIRs[${k}]=${dirabs}/${k}/${p}
+		# echo ${REP_DIRs[$k]};
+	done
+}
+
+build_luajit()
+{
+	curr=`pwd`;
+	build_tag=`cd ${WRK_Lo}; pwd`;
+	build_tag+="/.luajit_build.tag";
+	
+	LuaJit_Path=`cd "${WRK_Lo}/luajit"; pwd`
+	log_file=`cd ${WRK_Lo}; pwd`
+	log_file+="/luajit.build_log"
+
+	if [ ! -d "${WRK_Lo}/luajit" ]; then
+		mkdir -p "${WRK_Lo}/luajit"
+	fi
+	if [ -f ${build_tag} ]; then
+		return;
+	fi
+
+	cd ${REP_DIRs['luajit']};
+	echo "======= make luajit ===============" > ${log_file}
+	make PREFIX="${LuaJit_Path}" >> ${log_file}
+	echo "======= make install luajit =======" >> ${log_file}
+	make install PREFIX="${LuaJit_Path}" >> ${log_file}
+	
+	touch ${build_tag};
+
+	cd $curr;
+}
+
+build_ngx()
+{
+	curr=`pwd`;
+	Ngnix_Path=`cd ${WRK_Lo}; pwd`;
+	Ngnix_Path+="/ngnix";
+	
+	ngx_log=`cd ${WRK_Lo}; pwd`;
+	ngx_log+="/ngx.build_log"
+
+	build_tag=`cd ${WRK_Lo}; pwd`;
+	build_tag+="/.ngx_build.tag"	
+
+	if [ ! -d $Ngnix_Path ]; then
+		mkdir -p $Ngnix_Path;
+	fi
+	if [ -f ${build_tag} ]; then
+		return;
+	fi
+
+
+	lj_lib=`cd ${LuaJit_Path}/lib; pwd`;
+	lj_inc=`cd ${LuaJit_Path}/include; ls`;
+	lj_inc=`cd ${LuaJit_Path}/include/${lj_inc}; pwd`;
+	
+	export LUAJIT_LIB=${lj_lib};
+	export LUAJIT_INC=${lj_inc};
+	
+	cd ${REP_DIRs['ngx']};
+	pwd;
+	Ngx_Build_Script="";
+	run="./configure --prefix=${Ngnix_Path} "
+	run+="--with-ld-opt=\"-Wl,-rpath,${lj_lib}\" "
+	run+="--add-module=${REP_DIRs['ndk']} "
+	run+="--add-module=${REP_DIRs['ngx_lua']} "
+	
+	run=`echo -e ${run}`;
+	echo $run;
+	Ngx_Build_Script+="$run";
+	
+	echo "======== configure ============" > ${ngx_log}
+	eval "$run >> ${ngx_log}"
+	
+	echo "======== make -j2 =============" >> ${ngx_log}
+	run="make -j2"
+	Ngx_Build_Script+=";$run";	
+	eval "$run >> ${ngx_log}"
+	
+	echo "======== make install =========" >> ${ngx_log}
+	run="make install"	
+ 	Ngx_Build_Script+=";$run";
+	eval "$run >> ${ngx_log}"	
+	
+	touch ${build_tag}
+
+	cd $curr;
+}
+
+digest()
+{
+	wrk=`cd ${WRK_Lo}; pwd`
+	pr_info "++++++++++++++ Summary for Ngx Env +++++++++++++++++" info
+	pr_info "+ working_directory | ${wrk} " info
+	pr_info "+ ngx_dir           | ${Ngnix_Path}" info
+	pr_info "+ ngx_build_script  " info
+	pr_info "${Ngx_Build_Script} " info
+}
 
 
 main_process()
 {
-	dl
+	pre_work;
+	dl;
+	unzip;
+
+	build_luajit;
+	build_ngx;
+
+	# digest;
 }
 
 
