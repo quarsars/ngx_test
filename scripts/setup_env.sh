@@ -85,26 +85,47 @@ build_luajit()
 	build_tag=`cd ${WRK_Lo}; pwd`;
 	build_tag+="/.luajit_build.tag";
 	
-	LuaJit_Path=`cd "${WRK_Lo}/luajit"; pwd`
 	log_file=`cd ${WRK_Lo}; pwd`
 	log_file+="/luajit.build_log"
 
 	if [ ! -d "${WRK_Lo}/luajit" ]; then
 		mkdir -p "${WRK_Lo}/luajit"
 	fi
+	LuaJit_Path=`cd "${WRK_Lo}/luajit"; pwd`
+
 	if [ -f ${build_tag} ]; then
 		return;
 	fi
 
 	cd ${REP_DIRs['luajit']};
 	echo "======= make luajit ===============" > ${log_file}
+	pr_info "build luajit: compiling..." warn verbose
 	make PREFIX="${LuaJit_Path}" >> ${log_file}
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		pr_info "  compile success." info verbose
+	else
+		pr_info "  compile failed: ${ret}." error verbose
+		return $ret;
+	fi
+
 	echo "======= make install luajit =======" >> ${log_file}
+	pr_info "build luajit: installing..." warn verbose
+
 	make install PREFIX="${LuaJit_Path}" >> ${log_file}
-	
+	ret=$?	
+
+    if [ $ret -eq 0 ]; then
+        pr_info "  install success, installed to [ ${LuaJit_Path} ]." info verbose
+    else
+        pr_info "  install failed: $ret." error verbose
+        return $ret;
+    fi  
+
 	touch ${build_tag};
 
 	cd $curr;
+	return 0;
 }
 
 build_ngx()
@@ -147,21 +168,52 @@ build_ngx()
 	Ngx_Build_Script+="$run";
 	
 	echo "======== configure ============" > ${ngx_log}
+	pr_info "build ngx: configuring..." warn verbose
 	eval "$run >> ${ngx_log}"
+	ret=$?
+    if [ $ret -eq 0 ]; then
+        pr_info "  configure success." info verbose
+    else
+        pr_info "  configure failed: ${ret}." error verbose
+        return $ret;
+    fi	
+
 	
 	echo "======== make -j2 =============" >> ${ngx_log}
 	run="make -j2"
 	Ngx_Build_Script+=";$run";	
-	eval "$run >> ${ngx_log}"
 	
+	pr_info "build ngx: compiling..." warn verbose
+	eval "$run >> ${ngx_log}"
+	ret=$?;	
+    if [ $ret -eq 0 ]; then
+        pr_info "  compile success." info verbose
+    else
+        pr_info "  compile failed: ${ret}." error verbose
+        return $ret;
+    fi
+
+
 	echo "======== make install =========" >> ${ngx_log}
-	run="make install"	
+	run="make install"
  	Ngx_Build_Script+=";$run";
-	eval "$run >> ${ngx_log}"	
+
+	pr_info "build ngx: installing..." warn verbose
+	eval "$run >> ${ngx_log}"
+
+	ret=$?;
+    if [ $ret -eq 0 ]; then
+        pr_info "  install success." info verbose
+    else
+        pr_info "  install failed: ${ret}." error verbose
+        return $ret;
+    fi
+
 	
 	touch ${build_tag}
 
 	cd $curr;
+	return 0;
 }
 
 digest()
@@ -182,9 +234,12 @@ main_process()
 	unzip;
 
 	build_luajit;
-	build_ngx;
-
-	# digest;
+	if [ $? -eq 0 ]; then
+		build_ngx;
+		if [ $? -eq 0 ]; then
+			digest;
+		fi
+	fi
 }
 
 
