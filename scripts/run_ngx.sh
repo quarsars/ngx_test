@@ -13,7 +13,7 @@ ngx_test_and_run()
 		pr_info "ready to run nginx..." info verbose
 		${where}/sbin/nginx -c ${where}/../../lua-ngx-modules/confs/lua-ngx.conf;
 
-		ps -ef | grep "nginx" | grep "ywj";
+		ps -ef | grep "nginx" | grep --color=auto "fatiao";
 	else
 		pr_info "test configuration error!."  error verbose
 	fi
