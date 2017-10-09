@@ -1,0 +1,7 @@
+# The New Way
+ngx_module_type=HTTP
+ngx_module_name=sum_ngx_module
+ngx_module_srcs="$ngx_addon_dir/sum_ngx_module.c"
+
+. auto/module
+

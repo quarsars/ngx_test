@@ -128,7 +128,9 @@ build_luajit()
 	return 0;
 }
 
-build_ngx()
+# 
+# build_ngx force extra_module_path
+build_ngx() 
 {
 	curr=`pwd`;
 	Ngnix_Path=`cd ${WRK_Lo}; pwd`;
@@ -143,10 +145,21 @@ build_ngx()
 	if [ ! -d $Ngnix_Path ]; then
 		mkdir -p $Ngnix_Path;
 	fi
+    
+    if [ "$1" = "force" ]; then
+        rm ${build_tag} 2>/dev/null;
+    fi
+
 	if [ -f ${build_tag} ]; then
 		return;
 	fi
 
+    extra=$2
+    if [ "$extra" != "" ]; then
+        if [ "${extra:0:1}" != '/' ]; then  #convert to abs path
+            extra=`cd "${curr}/${extra}"; pwd`;
+        fi
+    fi
 
 	lj_lib=`cd ${LuaJit_Path}/lib; pwd`;
 	lj_inc=`cd ${LuaJit_Path}/include; ls`;
@@ -162,7 +175,10 @@ build_ngx()
 	run+="--with-ld-opt=\"-Wl,-rpath,${lj_lib}\" "
 	run+="--add-module=${REP_DIRs['ndk']} "
 	run+="--add-module=${REP_DIRs['ngx_lua']} "
-	
+    if [ "${extra}" != "" ];then
+        run+="--add-module=${extra} ";
+    fi
+
 	run=`echo -e ${run}`;
 	echo $run;
 	Ngx_Build_Script+="$run";
@@ -177,8 +193,14 @@ build_ngx()
         pr_info "  configure failed: ${ret}." error verbose
         return $ret;
     fi	
+    
+    if [ "${extra}" != "" ];then
+        echo "======== make modules ============" >> ${ngx_log}
+        make modules >> ${ngx_log};
+        sos=`ls objs/*.so`;
+        pr_info "so: ${sos}" info verbose
+    fi
 
-	
 	echo "======== make -j2 =============" >> ${ngx_log}
 	run="make -j2"
 	Ngx_Build_Script+=";$run";	
@@ -256,5 +278,24 @@ main_process()
 	fi
 }
 
+case $1 in
+    ngx_setup_env )
+        main_process;
+        ;;
+    ngx_add_module )
+		pre_work;
+	    dl;
+    	unzip;
+    	build_luajit;
 
-main_process;
+        pr_info "add module [$2] to ngx.." warn verbose
+        build_ngx force $2;
+		digest;
+
+        ;;
+    * )
+        echo "$0 [ ngx_setup_env | ngx_add_module [extra_module_path] ]"
+        ;;
+esac
+
+
