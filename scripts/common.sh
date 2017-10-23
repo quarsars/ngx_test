@@ -101,3 +101,50 @@ pr_key_value()
 		pr_info "$str" $level 
 	}
 }
+
+mkdir_if_not_exist()
+{
+	if [ ! -d ${1} ]; then
+		mkdir -p ${1};
+	fi
+}
+
+#
+# unzip $1 to the same folder.
+#
+unzip_file()
+{
+	file_path=$1;
+	dir=$(dirname ${file_path});
+	file_fullname=${file_path##*/};
+
+	file_prefix=${file_fullname%%.*};
+	file_suffix=${file_fullname#*.};
+	
+	# echo ${dir};
+	# echo ${file_fullname};
+	
+	# echo ${file_prefix};
+	# echo ${file_suffix};
+	if [ -d ${dir}/${file_prefix} ]; then
+		pr_info "${dir}/${file_prefix}: target exist! do not unzip." warn verbose;
+		return -1;
+	else
+		mkdir -p ${dir}/${file_prefix};
+	fi
+
+	case ${file_suffix} in
+		"zip" )
+			uzcmd="unzip ${file_path} -d ${dir}/${file_prefix}";
+			;;
+		"tar.gz" )
+			uzcmd="tar zxvf ${file_path} -C ${dir}/${file_prefix}";
+			;;
+		* )
+			pr_info "unsupported format: ${file_suffix}." error verbose;
+			exit -1;
+			;;
+	esac
+	
+	eval ${uzcmd}
+}

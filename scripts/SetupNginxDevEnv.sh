@@ -1,8 +1,12 @@
 #!/bin/bash
 
 Scr_Lo=$(dirname $0)							# scripts location
+Scr_Lo=$(cd $dirname; pwd -P)					
+source ${Scr_Lo}/common.sh
+
 RES_Lo="${Scr_Lo}/../resource"					# resource location
-WRK_Lo="${Scr_Lo}/../work"						# working directory
+RES_PRE_Lo="${Scr_Lo}/../deps"
+Build_Lo="${Scr_Lo}/../build"					# working directory
 
 declare -A RES_URLs  # resource's URLs
 RES_URLs=(
@@ -11,6 +15,7 @@ RES_URLs=(
 ['ngx_lua']='https://github.com/openresty/lua-nginx-module/archive/v0.10.11rc2.tar.gz'
 ['ngx']='https://nginx.org/download/nginx-1.13.5.tar.gz'
 )
+declare -A RES_FILEs;
 
 declare -A RES_PRE_URLs
 RES_PRE_URLs=(
@@ -18,65 +23,73 @@ RES_PRE_URLs=(
 ['gzip']='http://www.gzip.org/gz124src.zip'
 ['zlib']='https://zlib.net/zlib-1.2.11.tar.gz'
 )
+declare -A RES_PRE_FILEs;
 
-declare -A RES_FILEs;
+
 declare -A REP_DIRs;
 LuaJit_Path="";
 Ngnix_Path="";
 Ngx_Build_Script="";
 
-source ${Scr_Lo}/common.sh
 
-
-
+# preparing works(such as mkdir/set some path)
 pre_work()
 {
-	if [ ! -d ${RES_Lo} ]; then
-		mkdir -p ${RES_Lo};
-	fi
-	
-	if [ ! -d ${WRK_Lo} ]; then
-		mkdir -p ${WRK_Lo};
-	fi
+	mkdir_if_not_exist ${RES_PRE_Lo}
+	mkdir_if_not_exist ${RES_Lo}
+	mkdir_if_not_exist ${Build_Lo}
 
-	# prerequire
-	
-	
-}
+	# setup pre-depends file names in RES_PRE_FILEs
+	for k in ${!RES_PRE_URLs[@]}
+	do
+		val=${RES_PRE_URLs[$k]};
+		RES_PRE_FILEs[${k}]=${k}-${val##*/};
+		echo $RES_PRE_FILEs[${k}];
+	done
 
-dl()
-{
+
+	# setup nginx-depends file names in RES_FILEs
 	for k in ${!RES_URLs[@]}
 	do
 		val=${RES_URLs[$k]};
 		RES_FILEs[${k}]=${k}-${val##*/};
+		echo $RES_FILEs[${k}];
+	done
+}
 
+
+# downloading
+dl_res_if_not_exist()
+{
+	for k in ${!RES_PRE_URLs[@]}
+	do
+		if [ ! -f "${RES_PRE_Lo}/${RES_PRE_FILEs[${k}]}" ]; then
+			pr_info "dl $k from ${RES_PRE_URLs[${k}]}:" warn verbose;
+			wget -O "${RES_PRE_Lo}/${RES_PRE_FILEs[${k}]}" ${RES_PRE_URLs[${k}]}
+			if [ $? -eq 0 ]; then
+				pr_info "dl failed: ${RES_PRE_FILEs[${k}]}" error verbose;
+				exit -1;
+			fi
+		fi
+	done
+
+	for k in ${!RES_URLs[@]}
+	do
 		if [ ! -f "${RES_Lo}/${RES_FILEs[${k}]}" ]; then
 			pr_info "dl $k from ${RES_URLs[${k}]}:" warn verbose
 			wget -O "${RES_Lo}/${RES_FILEs[${k}]}" ${RES_URLs[${k}]}
+			if [ $? -eq 0 ]; then
+				pr_info "dl failed: ${RES_FILEs[${k}]}" error verbose;
+				exit -1; 
+			fi
 		fi
 	done
 }
 
-unzip()
+# unzip the res
+unzip_res()
 {
-	dirabs=`cd ${RES_Lo}; pwd`;
-	for k in ${!RES_FILEs[@]}; do
-		if [ ! -d "${dirabs}/${k}" ]; then
-			mkdir -p "${dirabs}/${k}"
-		fi
-		if [ ! -f "${dirabs}/${k}/.extract.tag" ]; then
-			tar -zxvf "${RES_Lo}/${RES_FILEs[${k}]}" -C "${dirabs}/${k}" > /dev/null
-			touch "${dirabs}/${k}/.extract.tag"
-		fi
-		# echo ${dirabs}/${k}
-		# ls ${dirabs}/${k}
-		p=`ls ${dirabs}/${k}`		
 
-		pr_info "${k} extracted to: ${dirabs}/${k}/${p}" info verbose
-		REP_DIRs[${k}]=${dirabs}/${k}/${p}
-		# echo ${REP_DIRs[$k]};
-	done
 }
 
 build_luajit()
@@ -261,41 +274,4 @@ digest()
 	pr_info "${output}" info
 	echo "$output" >> ./Summary
 }
-
-
-main_process()
-{
-	pre_work;
-	dl;
-	unzip;
-
-	build_luajit;
-	if [ $? -eq 0 ]; then
-		build_ngx;
-		if [ $? -eq 0 ]; then
-			digest;
-		fi
-	fi
-}
-
-case $1 in
-    ngx_setup_env )
-        main_process;
-        ;;
-    ngx_add_module )
-		pre_work;
-	    dl;
-    	unzip;
-    	build_luajit;
-
-        pr_info "add module [$2] to ngx.." warn verbose
-        build_ngx force $2;
-		digest;
-
-        ;;
-    * )
-        echo "$0 [ ngx_setup_env | ngx_add_module [extra_module_path] ]"
-        ;;
-esac
-
 

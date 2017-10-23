@@ -2,3 +2,4 @@ resource/
 work/
 *.so
 Summary
+*.symbols
